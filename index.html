@@ -5,11 +5,17 @@
 <!--
   AFROTOK QUIZ LIVE  —  teiki5320.github.io/quizz/
 
-  Flow 100 % auto : roue casino → catégorie → question → décompte → réponse → description → loop.
+  Flow 100 % auto : roue casino → catégorie → question (votes live) → décompte → réponse → loop.
   Pour éditer les questions, modifie questions.js
   Format intrinsèque : 1080 × 1920 (TikTok vertical live). Fond noir pour les tests.
-  Pour passer en overlay transparent (OBS) : remplace `background: #000` par `background: transparent`
-  sur html, et `background: var(--bg)` par `background: transparent` sur body.
+
+  VOTES TIKTOK LIVE :
+    - Lance le bridge Node.js :   node tiktok-bridge.js <pseudo>
+    - La page se connecte à     ws://127.0.0.1:8080
+    - Les viewers tapent A, B, C, D (ou 1, 2, 3, 4) dans le chat
+    - 1 vote par viewer par question (dédoublonnage automatique)
+    - Si le bridge n'est pas lancé, la page fonctionne quand même
+      (barres à 0, tentative de reconnexion toutes les 3 s)
 -->
 <title>Afrotok Quiz Live</title>
 <meta name="viewport" content="width=1080, initial-scale=1">
@@ -282,8 +288,10 @@
     margin-top: 30px;
     width: 100%;
     display: flex;
+    align-items: center;
     justify-content: center;
-    min-height: 260px;
+    gap: 36px;
+    min-height: 280px;
   }
   .countdown-container {
     position: relative;
@@ -325,31 +333,93 @@
     100% { transform: scale(1); }
   }
 
-  /* === DESCRIPTION === */
-  .description {
-    display: none;
-    width: 960px;
-    min-height: 220px;
-    background: linear-gradient(135deg, rgba(245,200,66,0.15), rgba(46,204,113,0.1));
-    border: 3px solid var(--gold);
-    border-radius: 24px;
-    padding: 32px 48px;
-    box-shadow: 0 0 50px rgba(245,200,66,0.3);
+  /* === BARRES DE VOTE === */
+  .votes-container {
+    width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
-  .description.show {
+  .votes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 3px;
+    padding: 0 6px 2px;
+  }
+  .votes-title {
+    font-size: 26px;
+    color: #888;
+  }
+  .votes-total {
+    font-size: 28px;
+    color: var(--gold);
+    text-shadow: 0 0 10px rgba(245,200,66,0.5);
+  }
+  .vote-bar {
+    position: relative;
+    height: 54px;
+    background: #141414;
+    border: 2px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: opacity 0.4s, border-color 0.4s;
+  }
+  .vote-bar-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #3a3a3a, #5a5a5a);
+    transition: width 0.5s cubic-bezier(0.2, 0.9, 0.3, 1),
+                background 0.4s, box-shadow 0.4s;
+  }
+  .vote-bar.leading { border-color: var(--gold); }
+  .vote-bar.leading .vote-bar-fill {
+    background: linear-gradient(90deg, #F5C842, #FFE680);
+    box-shadow: 0 0 28px rgba(245,200,66,0.65) inset,
+                0 0 18px rgba(245,200,66,0.5);
+  }
+  .vote-bar.correct { border-color: var(--green); }
+  .vote-bar.correct .vote-bar-fill {
+    background: linear-gradient(90deg, #2ECC71, #58E894);
+    box-shadow: 0 0 35px rgba(46,204,113,0.9) inset,
+                0 0 22px rgba(46,204,113,0.7);
+  }
+  .vote-bar.wrong { opacity: 0.42; }
+  .vote-bar-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
-    animation: popBig 0.55s cubic-bezier(.2,1.4,.4,1);
-  }
-  .description-text {
-    width: 100%;
-    font-size: 34px;
-    font-weight: 700;
-    line-height: 1.35;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-family: 'Bebas Neue', sans-serif;
     color: #fff;
-    text-align: center;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.85);
   }
+  .vote-bar-letter { font-size: 36px; letter-spacing: 3px; }
+  .vote-bar-stats  { font-size: 30px; }
+  .vote-bar-stats .pct { opacity: 0.75; margin-left: 10px; }
+
+  /* === INDICATEUR DE CONNEXION === */
+  .conn-dot {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #444;
+    z-index: 60;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .conn-dot.online {
+    background: #2ECC71;
+    box-shadow: 0 0 14px rgba(46,204,113,0.9);
+  }
+  .conn-dot.offline { background: #E74C3C; }
 </style>
 </head>
 <body>
@@ -358,6 +428,8 @@
     <div class="logo">AFROTOK QUIZ</div>
     <div class="tagline">• LIVE •</div>
   </div>
+
+  <div class="conn-dot offline" id="connDot" title="Bridge TikTok"></div>
 
   <div class="flash-overlay" id="flashOverlay"></div>
 
@@ -388,8 +460,39 @@
         </svg>
         <div class="countdown-text" id="countdownText">5</div>
       </div>
-      <div class="description" id="descriptionBox">
-        <div class="description-text" id="descriptionText"></div>
+      <div class="votes-container" id="votesContainer">
+        <div class="votes-header">
+          <span class="votes-title">VOTES LIVE</span>
+          <span class="votes-total">👥 <span id="totalVotes">0</span></span>
+        </div>
+        <div class="vote-bar" data-letter="A">
+          <div class="vote-bar-fill"></div>
+          <div class="vote-bar-content">
+            <span class="vote-bar-letter">A</span>
+            <span class="vote-bar-stats"><span class="count">0</span><span class="pct">0%</span></span>
+          </div>
+        </div>
+        <div class="vote-bar" data-letter="B">
+          <div class="vote-bar-fill"></div>
+          <div class="vote-bar-content">
+            <span class="vote-bar-letter">B</span>
+            <span class="vote-bar-stats"><span class="count">0</span><span class="pct">0%</span></span>
+          </div>
+        </div>
+        <div class="vote-bar" data-letter="C">
+          <div class="vote-bar-fill"></div>
+          <div class="vote-bar-content">
+            <span class="vote-bar-letter">C</span>
+            <span class="vote-bar-stats"><span class="count">0</span><span class="pct">0%</span></span>
+          </div>
+        </div>
+        <div class="vote-bar" data-letter="D">
+          <div class="vote-bar-fill"></div>
+          <div class="vote-bar-content">
+            <span class="vote-bar-letter">D</span>
+            <span class="vote-bar-stats"><span class="count">0</span><span class="pct">0%</span></span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -432,6 +535,10 @@
   let usedIndices     = new Set();
   let currentQuestion = null;
   let currentCategory = null;
+  let currentState    = 'spin';                 // 'spin' | 'question' | 'reveal'
+  let votes           = { A: 0, B: 0, C: 0, D: 0 };
+  let voters          = new Set();              // dédoublonnage par pseudo
+  let ws              = null;
 
   // ========== AUTO-SCALE (test navigateur) ==========
   function fitViewport() {
@@ -562,6 +669,7 @@
 
   // ========== SPIN ==========
   function spinWheel() {
+    currentState = 'spin';
     showStage('stageSpin');
     const label = document.getElementById('spinLabel');
     label.classList.remove('announce');
@@ -658,12 +766,10 @@
       optionsEl.appendChild(div);
     });
 
-    // Reset countdown / description
-    const cdContainer = document.getElementById('countdownContainer');
-    const descBox     = document.getElementById('descriptionBox');
-    cdContainer.classList.remove('hidden');
-    descBox.classList.remove('show');
-    document.getElementById('descriptionText').textContent = '';
+    // Reset countdown + votes
+    document.getElementById('countdownContainer').classList.remove('hidden');
+    resetVotes();
+    currentState = 'question';
 
     const bar = document.getElementById('countdownBar');
     const circumference = 2 * Math.PI * 105;
@@ -712,17 +818,22 @@
 
   // ========== REVEAL ==========
   function revealAnswer() {
+    currentState = 'reveal';
+
     const opts = document.querySelectorAll('#options .option');
     opts.forEach(function (opt, i) {
       if (i === currentQuestion.correct) opt.classList.add('correct');
       else opt.classList.add('wrong');
     });
 
-    // Swap countdown -> description
+    // Highlight de la bonne barre de vote + cache timer
     document.getElementById('countdownContainer').classList.add('hidden');
-    const descBox = document.getElementById('descriptionBox');
-    document.getElementById('descriptionText').textContent = currentQuestion.description || '';
-    descBox.classList.add('show');
+    const correctLetter = ['A', 'B', 'C', 'D'][currentQuestion.correct];
+    document.querySelectorAll('.vote-bar').forEach(function (bar) {
+      bar.classList.remove('leading');
+      if (bar.dataset.letter === correctLetter) bar.classList.add('correct');
+      else bar.classList.add('wrong');
+    });
 
     flashScreen();
     sDing();
@@ -730,8 +841,110 @@
     setTimeout(spinWheel, REVEAL_SECONDS * 1000);
   }
 
+  // ========== VOTES ==========
+  function resetVotes() {
+    votes  = { A: 0, B: 0, C: 0, D: 0 };
+    voters = new Set();
+    document.getElementById('totalVotes').textContent = '0';
+    document.querySelectorAll('.vote-bar').forEach(function (bar) {
+      bar.classList.remove('leading', 'correct', 'wrong');
+      bar.querySelector('.vote-bar-fill').style.width = '0%';
+      bar.querySelector('.count').textContent = '0';
+      bar.querySelector('.pct').textContent   = '0%';
+    });
+  }
+
+  function updateVoteBars() {
+    const total = votes.A + votes.B + votes.C + votes.D;
+    document.getElementById('totalVotes').textContent = total;
+    let maxVal = 0;
+    ['A', 'B', 'C', 'D'].forEach(function (l) {
+      if (votes[l] > maxVal) maxVal = votes[l];
+    });
+    ['A', 'B', 'C', 'D'].forEach(function (l) {
+      const bar = document.querySelector('.vote-bar[data-letter="' + l + '"]');
+      if (!bar) return;
+      const pct = total > 0 ? Math.round((votes[l] / total) * 100) : 0;
+      bar.querySelector('.vote-bar-fill').style.width = pct + '%';
+      bar.querySelector('.count').textContent = votes[l];
+      bar.querySelector('.pct').textContent   = pct + '%';
+      if (currentState === 'question') {
+        bar.classList.remove('leading');
+        if (maxVal > 0 && votes[l] === maxVal) bar.classList.add('leading');
+      }
+    });
+  }
+
+  function addVote(user, letter) {
+    if (currentState !== 'question') return;
+    if (!votes.hasOwnProperty(letter)) return;
+    if (voters.has(user)) return;
+    voters.add(user);
+    votes[letter]++;
+    updateVoteBars();
+  }
+
+  // ========== WEBSOCKET BRIDGE ==========
+  const DIGIT_MAP = { '1': 'A', '2': 'B', '3': 'C', '4': 'D' };
+
+  function extractVote(data) {
+    if (!data) return null;
+    let user = null, msg = null;
+
+    // Format natif du bridge : { user, message }
+    if (typeof data.user === 'string' && typeof data.message === 'string') {
+      user = data.user; msg = data.message;
+    }
+    // Formats compatibles StreamerBot
+    else if (data.userName && data.message) { user = data.userName; msg = data.message; }
+    else if (data.data && data.data.message) {
+      const m = data.data.message;
+      if (typeof m === 'object') {
+        user = (m.user && m.user.name) || m.userName || m.displayName || m.nickname;
+        msg  = m.message || m.text;
+      } else if (typeof m === 'string') {
+        user = (data.data.user && data.data.user.name) || data.data.userName || data.data.displayName;
+        msg  = m;
+      }
+    }
+
+    if (!user || !msg) return null;
+    let letter = String(msg).trim().toUpperCase().charAt(0);
+    if (DIGIT_MAP[letter]) letter = DIGIT_MAP[letter];
+    if (['A', 'B', 'C', 'D'].indexOf(letter) === -1) return null;
+    return { user: user, letter: letter };
+  }
+
+  function updateConnStatus(online) {
+    const dot = document.getElementById('connDot');
+    if (!dot) return;
+    dot.className = 'conn-dot ' + (online ? 'online' : 'offline');
+  }
+
+  function connectWS() {
+    try {
+      ws = new WebSocket('ws://127.0.0.1:8080');
+      ws.onopen    = function () { updateConnStatus(true); };
+      ws.onclose   = function () {
+        updateConnStatus(false);
+        setTimeout(connectWS, 3000);
+      };
+      ws.onerror   = function () { try { ws.close(); } catch (e) {} };
+      ws.onmessage = function (evt) {
+        try {
+          const parsed = extractVote(JSON.parse(evt.data));
+          if (parsed) addVote(parsed.user, parsed.letter);
+        } catch (e) { /* ignore */ }
+      };
+    } catch (e) {
+      updateConnStatus(false);
+      setTimeout(connectWS, 3000);
+    }
+  }
+
   // ========== INIT ==========
   buildWheel();
+  connectWS();
   setTimeout(spinWheel, 1200);
 
 })();
