@@ -1,1 +1,526 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<!--
+  AFROTOK QUIZ LIVE  —  teiki5320.github.io/quizz/
 
+  Application 100% autonome : roue casino -> catégorie -> question -> décompte -> réponse -> boucle.
+  Pour modifier les questions, édite simplement questions.js
+  Format intrinsèque : 1080 x 1920 (TikTok vertical live).
+  Fond noir pour les tests. Pour repasser en fond transparent (overlay OBS),
+  remplacer `background: #000;` par `background: transparent;` sur html et body.
+-->
+<title>Afrotok Quiz Live</title>
+<meta name="viewport" content="width=1080, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0A0A0A;
+    --gold: #F5C842;
+    --green: #2ECC71;
+    --red: #E74C3C;
+    --blue: #3498DB;
+    --orange: #E67E22;
+  }
+
+  html {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+  }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Nunito', sans-serif;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform-origin: center center;
+    overflow: hidden;
+  }
+
+  /* === HEADER === */
+  .header {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 2;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 110px;
+    line-height: 1;
+    color: var(--gold);
+    letter-spacing: 10px;
+    text-shadow: 0 0 40px rgba(245, 200, 66, 0.55);
+  }
+  .tagline {
+    font-size: 30px;
+    color: #888;
+    letter-spacing: 10px;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* === STAGES === */
+  .stage {
+    position: absolute;
+    top: 260px;
+    left: 0;
+    right: 0;
+    bottom: 40px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 50px;
+  }
+  .stage.active { display: flex; }
+
+  /* === WHEEL === */
+  #stageSpin { justify-content: center; }
+
+  .wheel-container {
+    position: relative;
+    width: 960px;
+    height: 960px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wheel-spinner {
+    width: 960px;
+    height: 960px;
+    transition: transform 5s cubic-bezier(0.17, 0.85, 0.2, 1);
+    transform-origin: center center;
+    filter: drop-shadow(0 0 50px rgba(245, 200, 66, 0.3));
+  }
+  .wheel-svg {
+    width: 100%;
+    height: 100%;
+  }
+  .wheel-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 44px solid transparent;
+    border-right: 44px solid transparent;
+    border-top: 80px solid var(--gold);
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+    z-index: 10;
+  }
+  .wheel-hub {
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 8px solid var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 56px;
+    color: var(--gold);
+    z-index: 5;
+    box-shadow: 0 0 40px rgba(245, 200, 66, 0.6);
+  }
+  .spin-label {
+    margin-top: 50px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    color: var(--gold);
+    letter-spacing: 8px;
+    text-align: center;
+  }
+  .spin-label.spinning {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(0.96); }
+  }
+
+  /* === QUESTION === */
+  .category-badge {
+    padding: 22px 56px;
+    border-radius: 70px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 58px;
+    letter-spacing: 5px;
+    margin-bottom: 36px;
+    color: #0A0A0A;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.35), 0 0 30px rgba(255,255,255,0.1);
+  }
+  .cat-musique    { background: var(--gold); }
+  .cat-geographie { background: var(--blue); }
+  .cat-culture    { background: var(--orange); }
+  .cat-football   { background: var(--green); }
+
+  .question-text {
+    font-family: 'Nunito', sans-serif;
+    font-size: 62px;
+    font-weight: 900;
+    text-align: center;
+    line-height: 1.15;
+    color: #fff;
+    margin-bottom: 40px;
+    min-height: 230px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+  }
+  .option {
+    background: #1a1a1a;
+    border: 4px solid #333;
+    border-radius: 24px;
+    padding: 30px 36px;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    font-size: 42px;
+    font-weight: 700;
+    color: #fff;
+    transition: background 0.4s, border-color 0.4s, transform 0.4s, box-shadow 0.4s, opacity 0.4s;
+  }
+  .option-letter {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    line-height: 1;
+    color: var(--gold);
+    min-width: 70px;
+  }
+  .option-text { flex: 1; }
+
+  .option.correct {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+    box-shadow: 0 0 50px rgba(46, 204, 113, 0.7);
+    transform: scale(1.03);
+  }
+  .option.correct .option-letter { color: #fff; }
+
+  .option.wrong {
+    background: #2a1010;
+    border-color: rgba(231, 76, 60, 0.5);
+    opacity: 0.45;
+  }
+  .option.wrong .option-letter { color: var(--red); }
+
+  /* === COUNTDOWN === */
+  .countdown-wrap {
+    margin-top: 36px;
+    display: flex;
+    justify-content: center;
+  }
+  .countdown-container {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .countdown-svg {
+    width: 240px;
+    height: 240px;
+    transform: rotate(-90deg);
+  }
+  .countdown-track {
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-width: 16;
+  }
+  .countdown-bar {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 16;
+    stroke-linecap: round;
+  }
+  .countdown-text {
+    position: absolute;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 150px;
+    line-height: 1;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">AFROTOK QUIZ</div>
+    <div class="tagline">LIVE</div>
+  </div>
+
+  <!-- STAGE 1 : SPIN -->
+  <div class="stage active" id="stageSpin">
+    <div class="wheel-container">
+      <div class="wheel-spinner" id="wheelSpinner">
+        <svg class="wheel-svg" viewBox="0 0 600 600">
+          <g id="wheelSegments"></g>
+        </svg>
+      </div>
+      <div class="wheel-pointer"></div>
+      <div class="wheel-hub">GO!</div>
+    </div>
+    <div class="spin-label spinning" id="spinLabel">LA ROUE TOURNE...</div>
+  </div>
+
+  <!-- STAGE 2 : QUESTION + COUNTDOWN + REVEAL -->
+  <div class="stage" id="stageQuestion">
+    <div class="category-badge" id="categoryBadge">MUSIQUE</div>
+    <div class="question-text" id="questionText">—</div>
+    <div class="options" id="options"></div>
+    <div class="countdown-wrap">
+      <div class="countdown-container">
+        <svg class="countdown-svg" viewBox="0 0 240 240">
+          <circle class="countdown-track" cx="120" cy="120" r="105"></circle>
+          <circle class="countdown-bar"   id="countdownBar" cx="120" cy="120" r="105"></circle>
+        </svg>
+        <div class="countdown-text" id="countdownText">5</div>
+      </div>
+    </div>
+  </div>
+
+<script src="questions.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ========== CONFIG ==========
+  const COUNTDOWN_SECONDS = 5;
+  const REVEAL_SECONDS    = 5;
+  const SPIN_DURATION_MS  = 5000;
+  const N_SEGMENTS        = 12; // 4 catégories x 3
+
+  const CATEGORIES = {
+    musique:    { label: 'MUSIQUE',   emoji: '🎵', color: '#F5C842', cssClass: 'cat-musique' },
+    geographie: { label: 'GÉO',       emoji: '🌍', color: '#3498DB', cssClass: 'cat-geographie' },
+    culture:    { label: 'CULTURE',   emoji: '🎭', color: '#E67E22', cssClass: 'cat-culture' },
+    football:   { label: 'FOOT',      emoji: '⚽', color: '#2ECC71', cssClass: 'cat-football' }
+  };
+  const CAT_ORDER = ['musique', 'geographie', 'culture', 'football'];
+
+  const WHEEL_SEGMENTS = [];
+  for (let i = 0; i < N_SEGMENTS; i++) WHEEL_SEGMENTS.push(CAT_ORDER[i % 4]);
+  const ANGLE_PER_SEG = 360 / N_SEGMENTS;
+
+  // ========== STATE ==========
+  let wheelRotation   = 0;
+  let usedIndices     = new Set();
+  let currentQuestion = null;
+  let currentCategory = null;
+
+  // ========== AUTO-SCALE (pour tester dans un navigateur) ==========
+  function fitViewport() {
+    const s = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+    document.body.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fitViewport);
+  fitViewport();
+
+  // ========== WHEEL BUILD ==========
+  function buildWheel() {
+    const group = document.getElementById('wheelSegments');
+    const cx = 300, cy = 300, r = 290;
+
+    for (let i = 0; i < N_SEGMENTS; i++) {
+      const catId = WHEEL_SEGMENTS[i];
+      const cat   = CATEGORIES[catId];
+
+      const a1 = (-90 + i * ANGLE_PER_SEG) * Math.PI / 180;
+      const a2 = (-90 + (i + 1) * ANGLE_PER_SEG) * Math.PI / 180;
+      const x1 = cx + r * Math.cos(a1);
+      const y1 = cy + r * Math.sin(a1);
+      const x2 = cx + r * Math.cos(a2);
+      const y2 = cy + r * Math.sin(a2);
+      const largeArc = ANGLE_PER_SEG > 180 ? 1 : 0;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d',
+        'M ' + cx + ' ' + cy +
+        ' L ' + x1 + ' ' + y1 +
+        ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 +
+        ' Z');
+      path.setAttribute('fill', cat.color);
+      path.setAttribute('stroke', '#0A0A0A');
+      path.setAttribute('stroke-width', '3');
+      group.appendChild(path);
+
+      // Emoji au milieu du segment
+      const bisAngle = (-90 + i * ANGLE_PER_SEG + ANGLE_PER_SEG / 2) * Math.PI / 180;
+      const tr = r * 0.72;
+      const tx = cx + tr * Math.cos(bisAngle);
+      const ty = cy + tr * Math.sin(bisAngle);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', tx);
+      text.setAttribute('y', ty);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'central');
+      text.setAttribute('font-size', '62');
+      text.textContent = cat.emoji;
+      group.appendChild(text);
+    }
+  }
+
+  // ========== STAGES ==========
+  function showStage(id) {
+    document.querySelectorAll('.stage').forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ========== SPIN ==========
+  function spinWheel() {
+    showStage('stageSpin');
+    const label = document.getElementById('spinLabel');
+    label.textContent = 'LA ROUE TOURNE...';
+    label.classList.add('spinning');
+
+    // Choix aléatoire du segment cible
+    const targetIndex = Math.floor(Math.random() * N_SEGMENTS);
+    currentCategory   = WHEEL_SEGMENTS[targetIndex];
+
+    // Centre du segment i dans le système SVG (CW depuis l'est) : -90 + i*30 + 15
+    // On veut l'amener à -90 (pointe du haut) => rotation R = -90 - centerAngle
+    const centerAngle = -90 + targetIndex * ANGLE_PER_SEG + ANGLE_PER_SEG / 2;
+    const desiredMod  = ((-90 - centerAngle) % 360 + 360) % 360;
+    const currentMod  = ((wheelRotation % 360) + 360) % 360;
+    let delta = desiredMod - currentMod;
+    if (delta < 0) delta += 360;
+    delta += 360 * 5; // 5 tours complets de drama
+
+    wheelRotation += delta;
+    document.getElementById('wheelSpinner').style.transform = 'rotate(' + wheelRotation + 'deg)';
+
+    // A la fin du spin : annonce, puis transition vers la question
+    setTimeout(function () {
+      const cat = CATEGORIES[currentCategory];
+      label.classList.remove('spinning');
+      label.textContent = cat.emoji + '  ' + cat.label + '  ' + cat.emoji;
+      setTimeout(showQuestion, 900);
+    }, SPIN_DURATION_MS + 100);
+  }
+
+  // ========== QUESTION PICK ==========
+  function pickQuestion(category) {
+    const candidates = [];
+    for (let i = 0; i < QUESTIONS.length; i++) {
+      if (QUESTIONS[i].category === category && !usedIndices.has(i)) candidates.push(i);
+    }
+    if (candidates.length === 0) {
+      // Toutes utilisées : on réinitialise cette catégorie
+      for (let i = 0; i < QUESTIONS.length; i++) {
+        if (QUESTIONS[i].category === category) {
+          usedIndices.delete(i);
+          candidates.push(i);
+        }
+      }
+    }
+    if (candidates.length === 0) return null; // catégorie vide dans questions.js
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    usedIndices.add(pick);
+    return QUESTIONS[pick];
+  }
+
+  // ========== SHOW QUESTION ==========
+  function showQuestion() {
+    const q = pickQuestion(currentCategory);
+    if (!q) {
+      // Fallback ultime : n'importe laquelle
+      currentQuestion = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+      currentCategory = currentQuestion.category;
+    } else {
+      currentQuestion = q;
+    }
+
+    const cat = CATEGORIES[currentCategory];
+    const badge = document.getElementById('categoryBadge');
+    badge.textContent = cat.emoji + '  ' + cat.label;
+    badge.className = 'category-badge ' + cat.cssClass;
+
+    document.getElementById('questionText').textContent = currentQuestion.question;
+
+    const optionsEl = document.getElementById('options');
+    optionsEl.innerHTML = '';
+    const letters = ['A', 'B', 'C', 'D'];
+    currentQuestion.options.forEach(function (opt, i) {
+      const div = document.createElement('div');
+      div.className = 'option';
+      div.innerHTML =
+        '<div class="option-letter">' + letters[i] + '</div>' +
+        '<div class="option-text">' + opt + '</div>';
+      optionsEl.appendChild(div);
+    });
+
+    // Prépare le countdown circulaire
+    const bar = document.getElementById('countdownBar');
+    const circumference = 2 * Math.PI * 105;
+    bar.setAttribute('stroke-dasharray', circumference);
+    bar.style.transition = 'none';
+    bar.setAttribute('stroke-dashoffset', 0);
+    bar.style.stroke = 'var(--gold)';
+    document.getElementById('countdownText').textContent = COUNTDOWN_SECONDS;
+
+    showStage('stageQuestion');
+
+    // Force reflow puis lance l'animation du stroke
+    bar.getBoundingClientRect();
+    bar.style.transition = 'stroke-dashoffset ' + COUNTDOWN_SECONDS + 's linear, stroke 0.3s';
+    bar.setAttribute('stroke-dashoffset', circumference);
+
+    // Décompte texte
+    let remaining = COUNTDOWN_SECONDS;
+    const textEl = document.getElementById('countdownText');
+    const tick = function () {
+      remaining--;
+      if (remaining <= 0) {
+        textEl.textContent = '0';
+        revealAnswer();
+        return;
+      }
+      textEl.textContent = remaining;
+      if (remaining <= 2) bar.style.stroke = 'var(--red)';
+      setTimeout(tick, 1000);
+    };
+    setTimeout(tick, 1000);
+  }
+
+  // ========== REVEAL ==========
+  function revealAnswer() {
+    const opts = document.querySelectorAll('#options .option');
+    opts.forEach(function (opt, i) {
+      if (i === currentQuestion.correct) opt.classList.add('correct');
+      else opt.classList.add('wrong');
+    });
+    setTimeout(spinWheel, REVEAL_SECONDS * 1000);
+  }
+
+  // ========== INIT ==========
+  buildWheel();
+  setTimeout(spinWheel, 1200);
+
+})();
+</script>
+</body>
+</html>
