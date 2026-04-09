@@ -329,10 +329,11 @@
   .countdown-text {
     position: absolute;
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 150px;
+    font-size: 96px;
     line-height: 1;
     color: #fff;
     text-shadow: 0 0 30px rgba(245, 200, 66, 0.7);
+    letter-spacing: 2px;
   }
   .countdown-text.beat { animation: beat 0.5s ease-out; }
   @keyframes beat {
@@ -494,7 +495,7 @@
             <circle class="countdown-track" cx="120" cy="120" r="105"></circle>
             <circle class="countdown-bar"   id="countdownBar" cx="120" cy="120" r="105"></circle>
           </svg>
-          <div class="countdown-text" id="countdownText">5</div>
+          <div class="countdown-text" id="countdownText">2:00</div>
         </div>
         <div class="description" id="descriptionBox">
           <div class="description-text" id="descriptionText"></div>
@@ -543,7 +544,7 @@
   'use strict';
 
   // ========== CONFIG ==========
-  const COUNTDOWN_SECONDS = 5;
+  const COUNTDOWN_SECONDS = 120;
   const REVEAL_SECONDS    = 5;
   const SPIN_DURATION_MS  = 5000;
 
@@ -822,7 +823,7 @@
     bar.style.stroke = 'var(--gold)';
 
     const textEl = document.getElementById('countdownText');
-    textEl.textContent = COUNTDOWN_SECONDS;
+    textEl.textContent = formatTime(COUNTDOWN_SECONDS);
 
     showStage('stageQuestion');
 
@@ -844,19 +845,29 @@
     const tick = function () {
       remaining--;
       if (remaining <= 0) {
-        textEl.textContent = '0';
+        textEl.textContent = formatTime(0);
         revealAnswer();
         return;
       }
-      textEl.textContent = remaining;
-      textEl.classList.remove('beat');
-      void textEl.offsetWidth;
-      textEl.classList.add('beat');
-      sTick();
-      if (remaining <= 2) bar.style.stroke = 'var(--red)';
+      textEl.textContent = formatTime(remaining);
+      // On "beat" + tick sonore uniquement dans les 10 dernières secondes
+      if (remaining <= 10) {
+        textEl.classList.remove('beat');
+        void textEl.offsetWidth;
+        textEl.classList.add('beat');
+        sTick();
+      }
+      if (remaining <= 10) bar.style.stroke = 'var(--red)';
       setTimeout(tick, 1000);
     };
     setTimeout(tick, 1000);
+  }
+
+  function formatTime(seconds) {
+    const s = Math.max(0, seconds | 0);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ':' + (r < 10 ? '0' + r : r);
   }
 
   // ========== REVEAL ==========
