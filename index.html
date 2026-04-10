@@ -538,7 +538,34 @@
     </div>
   </div>
 
-<script src="questions.js"></script>
+<!-- Questions : 1 fichier par catégorie dans q/ -->
+<script src="q/musique.js"></script>
+<script src="q/geographie.js"></script>
+<script src="q/culture.js"></script>
+<script src="q/football.js"></script>
+<script src="q/gastronomie.js"></script>
+<script src="q/cinema.js"></script>
+<script src="q/histoire.js"></script>
+<script src="q/destinations.js"></script>
+<script src="q/faune.js"></script>
+<script src="q/telerealite.js"></script>
+<script src="q/devinettes.js"></script>
+<script>
+// Combine automatiquement toutes les catégories en un seul tableau
+var QUESTIONS = [].concat(
+  typeof Q_MUSIQUE      !== 'undefined' ? Q_MUSIQUE      : [],
+  typeof Q_GEOGRAPHIE   !== 'undefined' ? Q_GEOGRAPHIE   : [],
+  typeof Q_CULTURE      !== 'undefined' ? Q_CULTURE      : [],
+  typeof Q_FOOTBALL     !== 'undefined' ? Q_FOOTBALL     : [],
+  typeof Q_GASTRONOMIE  !== 'undefined' ? Q_GASTRONOMIE  : [],
+  typeof Q_CINEMA       !== 'undefined' ? Q_CINEMA       : [],
+  typeof Q_HISTOIRE     !== 'undefined' ? Q_HISTOIRE     : [],
+  typeof Q_DESTINATIONS !== 'undefined' ? Q_DESTINATIONS : [],
+  typeof Q_FAUNE        !== 'undefined' ? Q_FAUNE        : [],
+  typeof Q_TELEREALITE  !== 'undefined' ? Q_TELEREALITE  : [],
+  typeof Q_DEVINETTES   !== 'undefined' ? Q_DEVINETTES   : []
+);
+</script>
 <script>
 (function () {
   'use strict';
